@@ -36,11 +36,8 @@ class InspecRspecMiniJson < RSpec::Core::Formatters::JsonFormatter
   # Called after stop has been called and the run is complete.
   def dump_summary(summary)
     @output_hash[:version] = Inspec::VERSION
-    @output_hash[:summary] = {
-      duration: summary.duration,
-      example_count: summary.example_count,
-      failure_count: summary.failure_count,
-      skip_count: summary.pending_count,
+    @output_hash[:statistics] = {
+      duration: summary.duration
     }
   end
 
@@ -133,8 +130,51 @@ class InspecRspecJson < InspecRspecMiniJson
     @output_hash[:other_checks] = missing
   end
 
-  def dump_summary(summary)
-    super(summary)
+  def controls_summary()
+    total = 0
+    failed = 0
+    skipped = 0
+    passed = 0
+    critical = 0
+    major = 0
+    minor = 0
+
+    @profiles_info.each do |_name, profile|
+      profile[:controls].each do |_control_name, control|
+        if !control[:id].start_with? '(generated from '
+          next unless control[:results]
+          if control[:results].any? { |r| r[:status] == 'failed' }
+            failed += 1
+            if control[:impact] >= 0.7
+              critical += 1
+            elsif control[:impact] >= 0.4
+              major += 1
+            else
+              minor += 1
+            end
+          elsif control[:results].any? { |r| r[:status] == 'skipped' }
+            skipped += 1
+          else
+            passed += 1
+          end
+        end
+      end
+    end
+
+    total = failed + passed + skipped
+
+    { 'total' => total,
+      'failed' => {
+        'total' => failed,
+        'critical' => critical,
+        'major' => major,
+        'minor' => minor
+      },
+      'skipped' => skipped,
+      'passed' => passed }
+  end
+
+  def tests_summary()
     total = 0
     failed = 0
     skipped = 0
@@ -144,17 +184,19 @@ class InspecRspecJson < InspecRspecMiniJson
       total += profile[:controls].length
       profile[:controls].each do |_control_name, control|
         next unless control[:results]
-        if control[:results].any? { |r| r[:status] == 'failed' }
-          failed += 1
-        elsif control[:results].any? { |r| r[:status] == 'skipped' }
-          skipped += 1
-        else
-          passed += 1
+        control[:results].each do |result|
+          if result[:status] == 'failed'
+            failed +=1
+          elsif result[:status] == 'skipped'
+            skipped +=1
+          else
+            passed +=1
+          end
         end
       end
     end
 
-    # TODO: provide this information in the output
+    { 'total' => total, 'failed' => failed, 'skipped' => skipped, 'passed' => passed }
   end
 
   private
@@ -266,13 +308,28 @@ class InspecRspecCli < InspecRspecJson # rubocop:disable Metrics/ClassLength
       output.puts('')
     end
 
-    res = @output_hash[:summary]
-    passed = res[:example_count] - res[:failure_count] - res[:skip_count]
-    s = format('Summary: %s%d successful%s, %s%d failures%s, %s%d skipped%s',
-               COLORS['passed'], passed, COLORS['reset'],
-               COLORS['failed'], res[:failure_count], COLORS['reset'],
-               COLORS['skipped'], res[:skip_count], COLORS['reset'])
-    output.puts(s)
+    controls_res = controls_summary
+    tests_res = tests_summary
+
+    if controls_res['total'] > 0
+      s = format('Profile Summary: %s%d successful%s, %s%d failures%s, %s%d skipped%s',
+                COLORS['passed'], controls_res['passed'], COLORS['reset'],
+                COLORS['failed'], controls_res['failed']['total'], COLORS['reset'],
+                COLORS['skipped'], controls_res['skipped'], COLORS['reset'])
+      output.puts(s)
+    elsif !@anonymous_tests.empty?
+      s = format('Test Summary: %s%d successful%s, %s%d failures%s, %s%d skipped%s',
+                COLORS['passed'], tests_res['passed'], COLORS['reset'],
+                COLORS['failed'], tests_res['failed'], COLORS['reset'],
+                COLORS['skipped'], tests_res['skipped'], COLORS['reset'])
+      output.puts(s)
+    else
+      s = format('Test Summary: %s%d successful%s, %s%d failures%s, %s%d skipped%s',
+            COLORS['passed'], 0, COLORS['reset'],
+            COLORS['failed'], 0, COLORS['reset'],
+            COLORS['skipped'], 0, COLORS['reset'])
+      output.puts(s)
+    end
   end
 
   private
