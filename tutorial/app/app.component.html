@@ -1,0 +1,17 @@
+<div class="terminal-nav">
+  <span (click)="updateInstructions('prev')"> < </span>
+  <span (click)="updateInstructions('next')"> > </span>
+  <span> x </span>
+</div>
+
+<img src="inspec-logo.png" alt="Inspec Logo">
+<div class="main">
+  <div class="guide">
+    <p class="title">{{title}}</p>
+    <p [innerHTML]="formatInstructions()"></p>
+  </div>
+
+  <div class="cli">
+    <xterm-terminal (command)="evalCommand(command=$event)" [response]="response" [shell]="shell"></xterm-terminal>
+  </div>
+</div>

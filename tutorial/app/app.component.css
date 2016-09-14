@@ -1,0 +1,71 @@
+.main {
+  overflow: auto;
+}
+
+.terminal-nav {
+  display: inline-block;
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 120px;
+  height: 60px;
+  color: #888;
+  text-align: center;
+  line-height: 60px;
+  font-size: 30px;
+  font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  transition: all 200ms ease-in;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.terminal-nav span:hover {
+  color: #ccc;
+}
+
+img {
+  padding-top: 5px;
+  width: 160px;
+  height: 40px;
+  padding-bottom: 5px;
+}
+
+.guide {
+  -webkit-font-smoothing: antialiased;
+  color: #DDDDDD;
+  font-family: 'Ubuntu Mono', 'Monaco', sans-serif;
+  letter-spacing: 1.2px;
+  font-size: 15px;
+  max-width: 1000px;
+  margin: auto;
+  padding: 1rem;
+  background-color: #444;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.title {
+  color: lightskyblue;
+}
+
+p {
+  display: block;
+}
+
+/* This syntax is my new best friend for when nothing else works!
+I'm unsure why, but attempting to set the style of code in this setting is just
+not working....but this works! */
+:host /deep/ code {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.cli {
+  -webkit-font-smoothing: antialiased;
+  font-family: monospace;
+  font-size: 1.2rem;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-width: 1200px;
+  margin: auto;
+}
