@@ -28,7 +28,7 @@ module Inspec
   # r.run
   # ```
   #
-  class Runner # rubocop:disable Metrics/ClassLength
+  class Runner
     extend Forwardable
 
     def_delegator :@test_collector, :report
@@ -182,58 +182,10 @@ module Inspec
 
     private
 
-    def block_source_info(block)
-      return {} if block.nil? || !block.respond_to?(:source_location)
-      opts = {}
-      file_path, line = block.source_location
-      opts['file_path'] = file_path
-      opts['line_number'] = line
-      opts
-    end
-
-    def get_check_example(method_name, arg, block)
-      opts = block_source_info(block)
-
-      if !arg.empty? &&
-         arg[0].respond_to?(:resource_skipped) &&
-         !arg[0].resource_skipped.nil?
-        return @test_collector.example_group(*arg, opts) do
-          it arg[0].resource_skipped
-        end
-      else
-        # add the resource
-        case method_name
-        when 'describe'
-          return @test_collector.example_group(*arg, opts, &block)
-        when 'expect'
-          return block.example_group
-        when 'describe.one'
-          tests = arg.map do |x|
-            @test_collector.example_group(x[1][0], block_source_info(x[2]), &x[2])
-          end
-          return nil if tests.empty?
-          ok_tests = tests.find_all(&:run)
-          # return all tests if none succeeds; we will just report full failure
-          return tests if ok_tests.empty?
-          # otherwise return all working tests
-          return ok_tests
-        else
-          fail "A rule was registered with #{method_name.inspect}, "\
-               "which isn't understood and cannot be processed."
-        end
-      end
-      nil
-    end
-
     def register_rule(rule)
       Inspec::Log.debug "Registering rule #{rule}"
       @rules << rule
-      checks = ::Inspec::Rule.prepare_checks(rule)
-      examples = checks.flat_map do |m, a, b|
-        get_check_example(m, a, b)
-      end.compact
-
-      examples.each { |e| @test_collector.add_test(e, rule) }
+      @test_collector.add_rule(rule)
     end
   end
 end

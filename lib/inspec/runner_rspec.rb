@@ -11,7 +11,7 @@ require 'inspec/rspec_json_formatter'
 # collide and disable all unit tests that have been added.
 
 module Inspec
-  class RunnerRspec
+  class RunnerRspec # rubocop:disable Metrics/ClassLength
     def initialize(conf)
       @conf = conf
       @formatter = nil
@@ -96,6 +96,21 @@ module Inspec
       configure_output
     end
 
+    #
+    # Add an Inspec::Rule to the set of tests we are going to run.
+    # First rules must be converted to Rspec::ExampleGroup's
+    #
+    # @params rule [Inspec::Rule]
+    #
+    def add_rule(rule)
+      checks = ::Inspec::Rule.prepare_checks(rule)
+      examples = checks.flat_map do |m, a, b|
+        check_to_example(m, a, b)
+      end.compact
+
+      examples.each { |e| add_test(e, rule) }
+    end
+
     private
 
     FORMATTERS = {
@@ -104,6 +119,51 @@ module Inspec
       'json-rspec' => 'InspecRspecVanilla',
       'cli' => 'InspecRspecCli',
     }.freeze
+
+    def block_source_info(block)
+      return {} if block.nil? || !block.respond_to?(:source_location)
+      opts = {}
+      file_path, line = block.source_location
+      opts['file_path'] = file_path
+      opts['line_number'] = line
+      opts
+    end
+
+    def check_to_example(method_name, arg, block)
+      opts = block_source_info(block)
+
+      skip_check = !arg.empty? && arg[0].respond_to?(:resource_skipped) && !arg[0].resource_skipped.nil?
+
+      if skip_check
+        example_group(*arg, opts) do
+          it arg[0].resource_skipped
+        end
+      else
+        case method_name
+        when 'describe'
+          example_group(*arg, opts, &block)
+        when 'expect'
+          block.example_group
+        when 'describe.one'
+          tests = arg.map do |x|
+            example_group(x[1][0], block_source_info(x[2]), &x[2])
+          end
+
+          return nil if tests.empty?
+          ok_tests = tests.find_all(&:run)
+
+          # return all tests if none succeeds; we will just report full failure
+          if ok_tests.empty?
+            tests
+          else
+            ok_tests
+          end
+        else
+          fail "A rule was registered with #{method_name.inspect}, "\
+               "which isn't understood and cannot be processed."
+        end
+      end
+    end
 
     # Configure the output formatter and stream to be used with RSpec.
     #

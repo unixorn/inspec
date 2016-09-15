@@ -17,7 +17,7 @@ module Inspec
                                    'attributes' => attributes })
     end
 
-    attr_reader :attributes, :rules, :profile_id, :resource_registry
+    attr_reader :attributes, :rules, :profile_id, :resource_registry, :backend
     def initialize(profile_id, backend, conf)
       if backend.nil?
         fail 'ProfileContext is initiated with a backend == nil. ' \
@@ -27,7 +27,8 @@ module Inspec
       @backend = backend
       @conf = conf.dup
       @rules = {}
-      @subcontexts = []
+      @control_subcontexts = []
+      @lib_subcontexts = []
       @require_loader = ::Inspec::RequireLoader.new
       @attributes = []
       # A local resource registry that only contains resources defined
@@ -45,7 +46,7 @@ module Inspec
     end
 
     def to_resources_dsl
-      Inspec::Resource.create_dsl(@backend, @resource_registry)
+      Inspec::Resource.create_dsl(self)
     end
 
     def control_eval_context
@@ -67,18 +68,31 @@ module Inspec
 
     def all_rules
       ret = @rules.values
-      ret += @subcontexts.map(&:all_rules).flatten
+      ret += @control_subcontexts.map(&:all_rules).flatten
       ret
+    end
+
+    def subcontext_by_name(name)
+      found = @lib_subcontexts.find { |c| c.profile_id == name }
+      if !found
+        @lib_subcontexts.each do |c|
+          found = c.subcontext_by_name(name)
+          break if found
+        end
+      end
+
+      found
     end
 
     def add_resources(context)
       @resource_registry.merge!(context.resource_registry)
       control_eval_context.add_resources(context)
+      @lib_subcontexts << context
       reload_dsl
     end
 
     def add_subcontext(context)
-      @subcontexts << context
+      @control_subcontexts << context
     end
 
     def load_libraries(libs)
